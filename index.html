@@ -249,6 +249,11 @@
             transform: translateY(6px);
             box-shadow: 0 0px 0 #d97706;
         }
+
+        /* Keypad button press effect */
+        .key-btn:active, .key-btn-del:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
@@ -261,12 +266,10 @@
 
     <!-- Machine -->
     <div class="machine-container">
-        <!-- Globe -->
         <div class="globe" id="globe">
             <div class="static-capsules" id="static-capsules"></div>
         </div>
         
-        <!-- Base -->
         <div class="base">
             <div class="brand-plate shadow-inner">
                 SKHBBSS GASHAPON
@@ -281,7 +284,6 @@
             </div>
         </div>
 
-        <!-- Dropping capsule -->
         <div class="drop-capsule" id="drop-capsule" style="background: linear-gradient(180deg, #ef4444 50%, #ffffff 50%);"></div>
     </div>
 
@@ -311,8 +313,43 @@
         </button>
     </div>
 
+    <!-- Keypad Modal (Pops up for Cash Coupon Winners) -->
+    <div id="keypad-modal" class="fixed inset-0 hidden items-center justify-center p-4 z-[60] backdrop-blur-sm bg-black/80">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center border-4 border-green-500">
+            <h3 class="text-xl font-black text-green-800 mb-1">請輸入班別及學號</h3>
+            <p class="text-xs text-gray-500 mb-4 text-center">領取現金券必須記錄資料 (例: 3A12)</p>
+            
+            <!-- Input Display -->
+            <div class="w-full bg-gray-100 border-2 border-gray-300 rounded-xl h-16 mb-4 flex items-center justify-center text-3xl font-black tracking-widest text-gray-800 shadow-inner" id="keypad-display">
+            </div>
+
+            <!-- Keypad Grid (0-9, A-D) -->
+            <div class="grid grid-cols-4 gap-2 w-full mb-4">
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">1</button>
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">2</button>
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">3</button>
+                <button class="key-btn bg-blue-100 hover:bg-blue-200 border-b-4 border-blue-300 text-blue-800 text-xl font-black py-4 rounded-xl transition-all">A</button>
+                
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">4</button>
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">5</button>
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">6</button>
+                <button class="key-btn bg-blue-100 hover:bg-blue-200 border-b-4 border-blue-300 text-blue-800 text-xl font-black py-4 rounded-xl transition-all">B</button>
+                
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">7</button>
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">8</button>
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all">9</button>
+                <button class="key-btn bg-blue-100 hover:bg-blue-200 border-b-4 border-blue-300 text-blue-800 text-xl font-black py-4 rounded-xl transition-all">C</button>
+                
+                <button class="key-btn-del bg-red-100 hover:bg-red-200 border-b-4 border-red-300 text-red-600 text-lg font-black py-4 rounded-xl transition-all">刪除</button>
+                <button class="key-btn bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-300 text-xl font-black py-4 rounded-xl transition-all col-span-2">0</button>
+                <button class="key-btn bg-blue-100 hover:bg-blue-200 border-b-4 border-blue-300 text-blue-800 text-xl font-black py-4 rounded-xl transition-all">D</button>
+            </div>
+            
+            <button id="keypad-submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-[0_6px_0_#166534] active:shadow-[0_0px_0_#166534] active:translate-y-[6px] transition-all text-xl uppercase">確認 Confirm</button>
+        </div>
+    </div>
+
     <script>
-        // Updated Google Apps Script Webhook URL
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxQMjtjWzf9eEGNkzRc8jrGO8gRXz9o2dgMfubtL-SlSV5RTMz5Z9Wep-R7SnVnISZE/exec";
 
         const drawBtn = document.getElementById('draw-btn');
@@ -326,7 +363,16 @@
         const closeResultBtn = document.getElementById('close-result-btn');
         const staticCapsulesContainer = document.getElementById('static-capsules');
 
+        // Keypad Elements
+        const keypadModal = document.getElementById('keypad-modal');
+        const keypadDisplay = document.getElementById('keypad-display');
+        const keypadSubmit = document.getElementById('keypad-submit');
+        const keys = document.querySelectorAll('.key-btn');
+        const delKey = document.querySelector('.key-btn-del');
+
         let isAnimating = false;
+        let currentPrize = null;
+        let classInputValue = "";
 
         // Odds: 50% Random Souvenir, 25% HKD $8 Coupon, 25% Specific Souvenir
         const PRIZES = [
@@ -370,8 +416,14 @@
             return PRIZES[0];
         }
 
-        function saveToGoogleSheet(prize) {
+        function saveToGoogleSheet(prize, studentInfo = "") {
             const timestamp = new Date().toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong' });
+            
+            // Merges the typed class string directly into the Prize Name so you don't have to edit Google Apps Script
+            let finalPrizeName = prize.name;
+            if (studentInfo !== "") {
+                finalPrizeName = `${prize.name} (得獎者: ${studentInfo})`;
+            }
             
             fetch(GOOGLE_SCRIPT_URL, {
                 method: "POST",
@@ -380,8 +432,8 @@
                     "Content-Type": "text/plain;charset=utf-8",
                 },
                 body: JSON.stringify({
-                    prize: prize.name,
-                    prize_name: prize.name,
+                    prize: finalPrizeName,
+                    prize_name: finalPrizeName,
                     prize_id: prize.id,
                     school: "SKHBBSS",
                     timestamp: timestamp
@@ -411,17 +463,18 @@
             }, 250);
         }
 
+        // --- DRAW SEQUENCE ---
         drawBtn.addEventListener('click', () => {
             if (isAnimating) return;
             isAnimating = true;
             drawBtn.disabled = true;
             
-            const wonPrize = determinePrize();
+            currentPrize = determinePrize();
             
-            dropCapsule.style.background = `linear-gradient(180deg, ${wonPrize.color} 50%, #ffffff 50%)`;
-            bigCapTop.style.background = wonPrize.color;
-            prizeNameEl.textContent = wonPrize.name;
-            prizeDescEl.textContent = wonPrize.desc;
+            dropCapsule.style.background = `linear-gradient(180deg, ${currentPrize.color} 50%, #ffffff 50%)`;
+            bigCapTop.style.background = currentPrize.color;
+            prizeNameEl.textContent = currentPrize.name;
+            prizeDescEl.textContent = currentPrize.desc;
 
             knob.classList.add('turning');
             
@@ -445,18 +498,77 @@
                     
                     setTimeout(() => {
                         triggerConfetti();
+                        
+                        // Condition: If it's a cash coupon, change button text and DON'T auto save yet
+                        if (currentPrize.id === 'coupon_8') {
+                            closeResultBtn.innerText = "輸入班別領取獎品";
+                            closeResultBtn.classList.remove('bg-white', 'text-green-700');
+                            closeResultBtn.classList.add('bg-green-600', 'text-white', 'border-none');
+                        } else {
+                            closeResultBtn.innerText = "領取獎品並關閉";
+                            closeResultBtn.classList.add('bg-white', 'text-green-700');
+                            closeResultBtn.classList.remove('bg-green-600', 'text-white', 'border-none');
+                            
+                            // It's a standard prize, save automatically in background
+                            saveToGoogleSheet(currentPrize);
+                        }
+                        
                         closeResultBtn.style.opacity = '1';
                     }, 400);
-
-                    // Send to Google Sheet
-                    saveToGoogleSheet(wonPrize);
-
                 }, 1000);
 
             }, 1400);
         });
 
+        // --- RESULT OVERLAY CLOSE ACTION ---
         closeResultBtn.addEventListener('click', () => {
+            if (currentPrize && currentPrize.id === 'coupon_8') {
+                // Open keypad modal for cash coupon winners
+                keypadModal.classList.remove('hidden');
+                keypadModal.classList.add('flex');
+            } else {
+                // Normal close
+                resetMachine();
+            }
+        });
+
+        // --- KEYPAD LOGIC ---
+        keys.forEach(key => {
+            key.addEventListener('click', () => {
+                // Limit to 5 characters (e.g. 5A123)
+                if (classInputValue.length < 5) {
+                    classInputValue += key.innerText;
+                    keypadDisplay.innerText = classInputValue;
+                }
+            });
+        });
+
+        delKey.addEventListener('click', () => {
+            classInputValue = classInputValue.slice(0, -1);
+            keypadDisplay.innerText = classInputValue;
+        });
+
+        keypadSubmit.addEventListener('click', () => {
+            if (classInputValue.length < 3) {
+                alert("請輸入完整的班別及學號 (例: 3A12)");
+                return;
+            }
+            
+            // Save to Google Sheet with class input
+            saveToGoogleSheet(currentPrize, classInputValue);
+            
+            // Close Everything
+            keypadModal.classList.add('hidden');
+            keypadModal.classList.remove('flex');
+            
+            // Reset input for next time
+            classInputValue = "";
+            keypadDisplay.innerText = "";
+            
+            resetMachine();
+        });
+
+        function resetMachine() {
             resultOverlay.classList.add('hidden');
             resultOverlay.classList.remove('flex');
             
@@ -466,7 +578,8 @@
             
             isAnimating = false;
             drawBtn.disabled = false;
-        });
+            currentPrize = null;
+        }
     </script>
 </body>
 </html>
