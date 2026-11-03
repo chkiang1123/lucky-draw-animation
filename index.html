@@ -281,7 +281,7 @@
             </div>
         </div>
 
-        <!-- The capsule that drops down during animation -->
+        <!-- Dropping capsule -->
         <div class="drop-capsule" id="drop-capsule" style="background: linear-gradient(180deg, #ef4444 50%, #ffffff 50%);"></div>
     </div>
 
@@ -312,8 +312,8 @@
     </div>
 
     <script>
-        // Apps Script Webhook URL
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxFTDZDeRcX2AiIJfL9fU1NhnbuEL6kt9tDWu2agkYSIaTZKizfcPnlJioCG0i637PI/exec";
+        // Updated Google Apps Script Webhook URL
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz8EJ92xOcGnged8anvm_GBLleZOq-DfM3ZRfcW7SRc-pz-0DBZbEzWEA49j4nDvlZ8/exec";
 
         const drawBtn = document.getElementById('draw-btn');
         const knob = document.getElementById('knob');
@@ -375,6 +375,7 @@
             
             fetch(GOOGLE_SCRIPT_URL, {
                 method: "POST",
+                mode: "no-cors",
                 headers: {
                     "Content-Type": "text/plain;charset=utf-8",
                 },
@@ -386,9 +387,8 @@
                     timestamp: timestamp
                 })
             })
-            .then(res => res.text())
-            .then(data => console.log("Google Sheet 寫入成功:", data))
-            .catch(err => console.error("Google Sheet 寫入失敗:", err));
+            .then(() => console.log("Google Sheet 請求已送出！"))
+            .catch(err => console.error("Google Sheet 發送失敗:", err));
         }
 
         function triggerConfetti() {
@@ -448,6 +448,7 @@
                         closeResultBtn.style.opacity = '1';
                     }, 400);
 
+                    // Send to Google Sheet
                     saveToGoogleSheet(wonPrize);
 
                 }, 1000);
